@@ -1,0 +1,112 @@
+---
+
+- name: Smart sockets configuration for a laundy finshed notifier
+  gather_facts: false
+  hosts: all
+  vars:
+    ntfy_host: "cubox:81"
+    ntfy_topic: "laundry"
+    ntfy_title: "Waschmaschine"
+    ntfy_msg_start: "Waschvorgang%20beginnt..."
+    ntfy_tag_start: "hourglass_flowing_sand"
+    ntfy_msg_done: "Waschvorgang%20beendet%20-%20Verbrauch:%20"
+    ntfy_tag_done: "%2B1"
+  tasks:
+    - name: Validate power hysteresis
+      fail: msg="'StartWatts' must be lower than 'DoneWatts'"
+      when: StartWatts < DoneWatts
+
+    - name: General task
+      include_role:
+        name: tobias_richter.tasmota
+      vars:
+        tasmota_commands:
+          # disable MQTT client
+          - command: SetOption3
+            value: 0
+          # do not save current power on/off state (for restoring upon reboot)
+          - command: SetOption0
+            value: 0
+          # keep power on upon reboot
+          - command: PowerOnState
+            value: 1
+          # enable modem sleep (default)
+          - command: SetOption127
+            value: 0
+          # disable use of LED as much as possible
+          - command: LedState
+            value: 0
+          # initialize variables
+          - command: Var1
+            value: 0
+          - command: Var2
+            value: 0
+          - command: Var3
+            value: 0
+          - command: Var4
+            value: 0
+          # create notification rule (with "run once" feature)
+          - command: Rule1
+            value: ON System#Boot DO
+                       var1 0
+                   ENDON
+                   ON ENERGY#Power>={{ StartWatts }} DO
+                     backlog
+                       event notifystart=%var1%;
+                       RuleTimer1 0;
+                       var1 1
+                   ENDON
+                   ON ENERGY#Power<={{ DoneWatts }} DO
+                       event maybedone=%var1%
+                   ENDON
+          # enable "run once" feature
+          - command: Rule1
+            value: 5
+          # enable rule execution
+          - command: Rule1
+            value: 1
+          # create event rule (evaluated continuously)
+          - command: Rule2
+            value: ON System#Boot DO
+                     backlog
+                       var2 0;
+                       var3 0;
+                       var4 0
+                   ENDON
+                   ON event#notifystart==0 DO
+                     backlog
+                       var3 %var2%;
+                       WebSend [{{ ntfy_host }}] /{{ ntfy_topic }}/publish?t={{ ntfy_title }}&m={{ ntfy_msg_start }}&ta={{ ntfy_tag_start }}
+                   ENDON
+                   ON event#maybedone==1 DO
+                     backlog
+                       var1 2;
+                       RuleTimer1 {{ OffGracePeriod }}
+                   ENDON
+                   ON Rules#Timer==1 DO
+                     backlog
+                       var4 %var2%;
+                       event donenext
+                   ENDON
+                   ON event#donenext DO
+                     backlog
+                       sub4 %var3%;
+                       event donenext2
+                   ENDON
+                   ON event#donenext2 DO
+                     backlog
+                       var1 0;
+                       WebSend [{{ ntfy_host }}] /{{ ntfy_topic }}/publish?t={{ ntfy_title }}&m={{ ntfy_msg_done }}%var4%%20kWh&ta={{ ntfy_tag_done }}
+                   ENDON
+                   ON ENERGY#total!=%var2% DO
+                       var2 %value%
+                   ENDON
+          # disable "run once" feature
+          - command: Rule2
+            value: 4
+          # enable rule execution
+          - command: Rule2
+            value: 1
+
+#                       WebQuery http://{{ ntfy_host }} POST {"topic":"{{ ntfy_topic }}","title":"{{ ntfy_title }}","message":"{{ ntfy_msg_start }}","tags":["{{ ntfy_tag_start }}"]}
+#                       WebQuery http://{{ ntfy_host }} POST {"topic":"{{ ntfy_topic }}","title":"{{ ntfy_title }}","message":"{{ ntfy_msg_done }}","tags":["{{ ntfy_tag_done }}"]}

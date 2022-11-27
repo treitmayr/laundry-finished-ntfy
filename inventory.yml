@@ -1,0 +1,10 @@
+---
+
+smartsocket:
+  hosts:
+    tasmota6:
+  vars:
+    StartWatts: 5
+    DoneWatts: 1
+    # grace period for pausing and putting some more clothes in
+    OffGracePeriod: 120
