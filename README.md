@@ -5,7 +5,7 @@ one which is able to notify you via [ntfy.sh](https://ntfy.sh/) about the finish
 laundry and the energy it consumed.
 
 This can be done with a simple smart socket running [Tasmota](https://tasmota.github.io/docs/)
-firmware, i.e. without running any MQTT broker or full-fledged home-automation system.
+firmware, i.e. without running any MQTT broker or full-fledged home automation system.
 
 ## Design
 
@@ -29,6 +29,7 @@ If during steps 4 the power rises back to at least `StartWatts`, the grace perio
 * Ansible (Ansible Core package is sufficient)
 * [Tobias Richter's tasmota ansible role](https://galaxy.ansible.com/tobias_richter/tasmota)
 * A running instance of [ntfy.sh](https://ntfy.sh/) (e.g. a self-hosted instance works well)
+* Some ntfy.sh client(s), e.g. a cell phone, subscribed to the topic "laundry".
 
 **Customization**
 
